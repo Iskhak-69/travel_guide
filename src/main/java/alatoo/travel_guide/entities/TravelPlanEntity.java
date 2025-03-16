@@ -1,9 +1,10 @@
 package alatoo.travel_guide.entities;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import lombok.experimental.FieldDefaults;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -12,26 +13,34 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class TravelPlanEntity {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    Long id;
 
-    @NotNull
-    private String planName;
+    @Column(nullable = false)
+    String planName;
 
-    @NotNull
-    private String startDate;
+    @Column(nullable = false)
+    LocalDateTime startDate;
 
-    @NotNull
-    private String endDate;
+    @Column(nullable = false)
+    LocalDateTime endDate;
 
-    @ManyToMany
-    @JoinTable(
-            name = "travel_plan_landmarks",
-            joinColumns = @JoinColumn(name = "travel_plan_id"),
-            inverseJoinColumns = @JoinColumn(name = "landmark_id")
-    )
-    private List<LandmarkEntity> landmarks;
+    @Column(nullable = false)
+    Double price;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    List<LandmarkEntity> landmarks;
+
+    public Double calculatePrice() {
+        if (landmarks == null || landmarks.isEmpty()) return 0.0;
+        double sum = landmarks.stream().mapToDouble(LandmarkEntity::getPrice).sum();
+        return sum + sum * 0.10;
+    }
+
+    public void updatePrice() {
+        this.price = calculatePrice();
+    }
 }

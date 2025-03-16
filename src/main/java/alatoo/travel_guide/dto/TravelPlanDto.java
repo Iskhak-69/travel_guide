@@ -1,13 +1,17 @@
 package alatoo.travel_guide.dto;
 
-import lombok.Data;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
+@Builder
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class TravelPlanDto {
-    private String planName;
-    private String startDate;
-    private String endDate;
-    private List<Long> landmarkIds;
+    String planName;
+    LocalDateTime startDate;
+    LocalDateTime endDate;
+    List<Long> landmarkIds;
 }
