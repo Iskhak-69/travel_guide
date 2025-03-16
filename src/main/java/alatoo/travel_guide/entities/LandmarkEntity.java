@@ -1,24 +1,32 @@
 package alatoo.travel_guide.entities;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @Entity
 @Table(name = "landmarks")
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class LandmarkEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    Long id;
 
-    @NotNull
-    private String name;
+    @Column(nullable = false, unique = true)
+    String title;
 
-    @NotNull
-    private String location;
+    @Column(nullable = false)
+    String description;
+
+    @Column(nullable = false)
+    String location;
+
+    @Column(nullable = false)
+    Double price;
+
+    String imageUrl;
 }
