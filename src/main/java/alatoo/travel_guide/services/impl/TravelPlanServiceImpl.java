@@ -36,18 +36,22 @@ public class TravelPlanServiceImpl implements TravelPlanService {
     @Autowired
     private TravelPlanMapper travelPlanMapper;
 
+    @Override
     public List<TravelPlanEntity> getAll() {
         return travelPlanRepository.findAll();
     }
 
+    @Override
     public TravelPlanEntity getById(Long id) {
         return travelPlanRepository.findById(id).orElseThrow(() -> new ApiException("Travel plan with id " + id + " is not found", HttpStatusCode.valueOf(404)));
     }
 
+    @Override
     public TravelPlanEntity create(TravelPlanEntity newTravelPlan) {
         return travelPlanRepository.save(newTravelPlan);
     }
 
+    @Override
     public TravelPlanEntity create(TravelPlanDto newTravelPlanDto) {
         TravelPlanEntity travelPlanEntity = travelPlanMapper.travelPlanDtoToTravelPlan(newTravelPlanDto);
         List<Long> requestedLandmarkIds = newTravelPlanDto.getLandmarkIds();
@@ -63,6 +67,7 @@ public class TravelPlanServiceImpl implements TravelPlanService {
         return travelPlanRepository.save(travelPlanEntity);
     }
 
+    @Override
     public TravelPlanEntity update(TravelPlanDto travelPlan, Long id) {
         TravelPlanEntity toUpdate = travelPlanRepository.findById(id).orElseThrow(() -> new ApiException("Travel plan with id " + id + " is not found", HttpStatusCode.valueOf(404)));
         if (travelPlan.getPlanName() != null) {
@@ -88,6 +93,7 @@ public class TravelPlanServiceImpl implements TravelPlanService {
         return travelPlanRepository.save(toUpdate);
     }
 
+    @Override
     public ResponseEntity<Map<String, Object>> delete(Long id) {
         Optional<TravelPlanEntity> travelPlan = travelPlanRepository.findById(id);
         if (travelPlan.isPresent()) {
@@ -104,6 +110,7 @@ public class TravelPlanServiceImpl implements TravelPlanService {
         else throw new ApiException("Travel plan with id " + id + " is not found", HttpStatusCode.valueOf(404));
     }
 
+    @Override
     public TravelPlanEntity deleteLandmark(List<Long> landmarkIds, Long travelPlanId) {
         TravelPlanEntity travelPlan = travelPlanRepository.findById(travelPlanId).orElseThrow(() -> new ApiException("Travel plan with id " + travelPlanId + " is not found", HttpStatusCode.valueOf(404)));
         List<LandmarkEntity> currentLandmarks = travelPlan.getLandmarks();
