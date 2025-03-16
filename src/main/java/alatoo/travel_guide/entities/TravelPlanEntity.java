@@ -9,8 +9,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "travel_plans")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)

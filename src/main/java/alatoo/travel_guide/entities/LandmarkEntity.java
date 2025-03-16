@@ -6,8 +6,9 @@ import lombok.experimental.FieldDefaults;
 
 @Entity
 @Table(name = "landmarks")
-@Getter
-@Setter
+//@Getter
+//@Setter
+@Data
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class LandmarkEntity {
