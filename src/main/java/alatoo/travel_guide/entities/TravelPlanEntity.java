@@ -23,6 +23,9 @@ public class TravelPlanEntity {
     String planName;
 
     @Column(nullable = false)
+    String destination;
+
+    @Column(nullable = false)
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime startDate;
 
