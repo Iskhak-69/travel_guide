@@ -42,3 +42,23 @@ Content-Type: application/json
   "username": "user123",
   "password": "securePassword123"
 }
+
+POST /trusted/auth/login
+Content-Type: application/json
+
+{
+  "username": "user123",
+  "password": "securePassword123"
+}
+
+
+{
+  "token": "JWT_ACCESS_TOKEN",
+  "email": "user@example.com",
+  "refreshToken": "JWT_REFRESH_TOKEN"
+}
+
+
+GET /trusted/auth/user/1
+Authorization: Bearer JWT_ACCESS_TOKEN
+
