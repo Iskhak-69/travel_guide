@@ -1,9 +1,11 @@
 package alatoo.travel_guide.security;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import javax.crypto.SecretKey;
 import java.math.BigInteger;
 import java.security.SecureRandom;
 import java.util.Date;
@@ -26,7 +28,7 @@ public class JwtTokenUtil {
                 .setSubject(username)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
-                .signWith(SignatureAlgorithm.HS256, secretKey)
+                .signWith(getSecretKey(secretKey), SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -42,18 +44,21 @@ public class JwtTokenUtil {
     public String generateVerificationToken(String email) {
         return Jwts.builder()
                 .setSubject(email)
+                .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + 60 * 60 * 1000)) // 1 hour
-                .signWith(SignatureAlgorithm.HS256, verificationKey)
+                .signWith(getSecretKey(verificationKey), SignatureAlgorithm.HS256)
                 .compact();
     }
 
     public String getEmailFromToken(String token) {
         try {
-            Claims claims = Jwts.parser()
-                    .setSigningKey(verificationKey)
+            Claims claims = Jwts
+                    .parserBuilder()
+                    .setSigningKey(getSecretKey(verificationKey))
                     .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
+                    .parseClaimsJws(token)
+                    .getBody();
+
             return claims.getSubject();
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid verification token", e);
@@ -62,16 +67,22 @@ public class JwtTokenUtil {
 
     public String getEmailFromExpiredToken(String token) {
         try {
-            Claims claims = Jwts.parser()
-                    .setSigningKey(verificationKey)
+            Claims claims = Jwts
+                    .parserBuilder()
+                    .setSigningKey(getSecretKey(verificationKey))
                     .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
+                    .parseClaimsJws(token)
+                    .getBody();
+
             return claims.getSubject();
         } catch (ExpiredJwtException e) {
             return e.getClaims().getSubject();
         } catch (Exception e) {
             throw new IllegalArgumentException("Unable to parse token", e);
         }
+    }
+
+    private SecretKey getSecretKey(String key) {
+        return Keys.hmacShaKeyFor(key.getBytes());
     }
 }

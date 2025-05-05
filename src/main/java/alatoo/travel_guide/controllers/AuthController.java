@@ -13,9 +13,7 @@ import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -30,42 +28,33 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/trusted/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 @Slf4j
 public class AuthController {
 
-    @Autowired
-    private UserService userService;
-
-    @Autowired
-    private AuthenticationManager authenticationManager;
-
-    @Autowired
-    private UserRepository userRepository;
-
+    private final UserService userService;
+    private final AuthenticationManager authenticationManager;
+    private final UserRepository userRepository;
     private final JwtTokenUtil jwtTokenUtil;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private EmailService emailService;
+    private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     @PostMapping("/sign-up")
     public ResponseEntity<?> signup(@Valid @RequestBody SignupDto dto) {
         if (userRepository.existsByEmail(dto.getEmail())) {
-            System.out.println("Email already exists");
+            log.warn("Email already exists: {}", dto.getEmail());
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Email is already in use");
         }
+
         UserEntity user = new UserEntity();
         user.setEmail(dto.getEmail());
         user.setPassword(passwordEncoder.encode(dto.getPassword()));
+        user.setUsername(dto.getUsername());
         userRepository.save(user);
 
         String token = jwtTokenUtil.generateVerificationToken(dto.getEmail());
         emailService.sendVerificationEmail(dto.getEmail(), token);
 
-        return ResponseEntity.ok("User registered successfully. verify your email");
+        return ResponseEntity.ok("User registered successfully. Please verify your email.");
     }
 
 
@@ -75,8 +64,8 @@ public class AuthController {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         if (!user.isVerified()) {
-            return ResponseEntity.status(HttpStatusCode.valueOf(401))
-                    .body("Verify your email before logging in");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("Please verify your email before logging in.");
         }
 
         try {
@@ -84,65 +73,63 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
+
             String token = jwtTokenUtil.generateToken(authentication.getName());
 
-            // Return token and email
             return ResponseEntity.ok(new JwtResponse(token, user.getEmail()));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Invalid username or password");
+            log.error("Login failed: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid email or password.");
         }
     }
 
-
     @GetMapping("/user/{id}")
-    public UserDto getUserById(@PathVariable Long id) {
-        return userService.getUserById(id);
+    public ResponseEntity<UserDto> getUserById(@PathVariable Long id) {
+        UserDto userDto = userService.getUserById(id);
+        return ResponseEntity.ok(userDto);
     }
-
 
     @GetMapping("/user/id-by-email")
     public ResponseEntity<?> getUserIdByEmail(@RequestParam String email) {
         log.info("Fetching user ID for email: {}", email);
         Optional<UserEntity> userOptional = userRepository.findByEmail(email);
 
-        if (userOptional.isEmpty()) {
-            log.warn("User not found for email: {}", email);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
-        }
-
-        UserEntity user = userOptional.get();
-        log.info("Found user ID: {}", user.getId());
-        return ResponseEntity.ok(user.getId());
+        return userOptional
+                .map(user -> ResponseEntity.ok(user.getId()))
+                .orElseGet(() -> {
+                    log.warn("User not found for email: {}", email);
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Long.valueOf("User not found"));
+                });
     }
-
 
     @GetMapping("/verify-email")
     public ResponseEntity<?> verifyEmail(@RequestParam String token) {
         try {
-            log.info("Received Token: {}", token);
+            log.info("Verifying token: {}", token);
             String email = jwtTokenUtil.getEmailFromToken(token);
 
             if (email == null) {
-                return ResponseEntity.status(HttpStatusCode.valueOf(400)).body("email is null");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid token: email not found.");
             }
 
-            UserEntity user = userRepository.findByEmail(email).orElseThrow(() -> new ApiException("verification token has expired or wrong email", HttpStatusCode.valueOf(404)));
+            UserEntity user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new ApiException("Verification token expired or invalid email", HttpStatus.NOT_FOUND));
+
             if (user.isVerified()) {
-                return ResponseEntity.status(HttpStatusCode.valueOf(400)).body("you already verified your email");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Email is already verified.");
             }
+
             user.setVerified(true);
             userRepository.save(user);
-            return ResponseEntity.ok("Email verified successfully");
-
+            return ResponseEntity.ok("Email verified successfully.");
         } catch (ExpiredJwtException e) {
-            log.error("your token is expired", e);
-            UserEntity user = userRepository.findByEmail(jwtTokenUtil.getEmailFromExpiredToken(token)).orElseThrow(() -> new ApiException("couldn't find email", HttpStatusCode.valueOf(404)));
-            userRepository.delete(user);
-            return ResponseEntity.status(HttpStatusCode.valueOf(400)).body("your token is expired. sign up again and verify email");
-        }
-        catch (Exception e) {
-            log.error("error while verifying email", e);
-            return ResponseEntity.status(HttpStatusCode.valueOf(400)).body("Invalid or expired token");
+            log.warn("Token expired", e);
+            String email = jwtTokenUtil.getEmailFromExpiredToken(token);
+            userRepository.findByEmail(email).ifPresent(userRepository::delete);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Token expired. Please sign up again.");
+        } catch (Exception e) {
+            log.error("Error during email verification", e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid or expired token.");
         }
     }
 }
