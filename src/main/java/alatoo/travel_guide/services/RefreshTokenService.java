@@ -3,11 +3,13 @@ package alatoo.travel_guide.services;
 import alatoo.travel_guide.entities.RefreshToken;
 import alatoo.travel_guide.entities.UserEntity;
 import alatoo.travel_guide.repositories.RefreshTokenRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -17,26 +19,34 @@ public class RefreshTokenService {
     private final RefreshTokenRepository refreshTokenRepository;
 
     @Value("${jwt.refresh-expiration}")
-    private Long refreshExpiration;
+    private Long refreshTokenDurationMs;
 
     public RefreshToken createRefreshToken(UserEntity user) {
-        RefreshToken token = new RefreshToken();
-        token.setUser(user);
-        token.setToken(UUID.randomUUID().toString());
-        token.setExpiryDate(LocalDateTime.now().plusMonths(refreshExpiration));
-        return refreshTokenRepository.save(token);
-    }
+        refreshTokenRepository.deleteByUser(user); // delete previous if exists
 
-    public RefreshToken verifyExpiration(RefreshToken token) {
-        if (token.getExpiryDate().isBefore(LocalDateTime.now())) {
-            refreshTokenRepository.delete(token);
-            throw new RuntimeException("Refresh token was expired. Please sign in again.");
-        }
-        return token;
+        RefreshToken token = RefreshToken.builder()
+                .user(user)
+                .token(UUID.randomUUID().toString())
+                .expiryDate(Instant.now().plusMillis(refreshTokenDurationMs))
+                .build();
+
+        return refreshTokenRepository.save(token);
     }
 
     public RefreshToken findByToken(String token) {
         return refreshTokenRepository.findByToken(token)
-                .orElseThrow(() -> new RuntimeException("Token not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
+    }
+
+    public void verifyExpiration(RefreshToken token) {
+        if (token.getExpiryDate().isBefore(Instant.now())) {
+            refreshTokenRepository.delete(token);
+            throw new IllegalArgumentException("Refresh token has expired");
+        }
+    }
+
+    @Transactional
+    public void deleteByUser(UserEntity user) {
+        refreshTokenRepository.deleteByUser(user);
     }
 }

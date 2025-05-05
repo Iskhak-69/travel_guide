@@ -7,6 +7,8 @@ import alatoo.travel_guide.repositories.UserRepository;
 import alatoo.travel_guide.security.JwtTokenUtil;
 import alatoo.travel_guide.services.RefreshTokenService;
 import alatoo.travel_guide.services.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,9 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
 
+    @Operation(summary = "User sign-up", description = "Registers a new user with email, password, and username")
+    @ApiResponse(responseCode = "200", description = "User registered successfully")
+    @ApiResponse(responseCode = "409", description = "Email already in use")
     @PostMapping("/sign-up")
     public ResponseEntity<?> signup(@Valid @RequestBody SignupDto dto) {
         if (userRepository.existsByEmail(dto.getEmail())) {
@@ -51,6 +56,9 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @Operation(summary = "User login", description = "Login with username and password")
+    @ApiResponse(responseCode = "200", description = "Returns JWT access and refresh tokens")
+    @ApiResponse(responseCode = "401", description = "Invalid credentials")
     public ResponseEntity<?> login(@RequestBody LoginDto dto) {
         UserEntity user = userRepository.findByUsername(dto.getUsername())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
@@ -71,12 +79,19 @@ public class AuthController {
         }
     }
 
+    @Operation(summary = "Get user by ID", description = "Returns the user's data by ID (JWT required)")
+    @ApiResponse(responseCode = "200", description = "Returns UserDto object")
+    @ApiResponse(responseCode = "403", description = "Forbidden, JWT missing or invalid")
+    @ApiResponse(responseCode = "404", description = "User not found")
     @GetMapping("/user/{id}")
     public ResponseEntity<UserDto> getUserById(@PathVariable Long id) {
         UserDto userDto = userService.getUserById(id);
         return ResponseEntity.ok(userDto);
     }
 
+    @Operation(summary = "Refresh JWT token", description = "Uses refresh token to generate a new access token")
+    @ApiResponse(responseCode = "200", description = "Returns new JWT token")
+    @ApiResponse(responseCode = "400", description = "Invalid or expired refresh token")
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshToken(@RequestBody TokenRefreshRequest request) {
         RefreshToken refreshToken = refreshTokenService.findByToken(request.getRefreshToken());
