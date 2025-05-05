@@ -1,11 +1,11 @@
 package alatoo.travel_guide.controllers;
 
-import alatoo.travel_guide.dto.JwtResponse;
-import alatoo.travel_guide.dto.SignupDto;
-import alatoo.travel_guide.dto.UserDto;
+import alatoo.travel_guide.dto.*;
+import alatoo.travel_guide.entities.RefreshToken;
 import alatoo.travel_guide.entities.UserEntity;
 import alatoo.travel_guide.repositories.UserRepository;
 import alatoo.travel_guide.security.JwtTokenUtil;
+import alatoo.travel_guide.services.RefreshTokenService;
 import alatoo.travel_guide.services.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +31,7 @@ public class AuthController {
     private final UserRepository userRepository;
     private final JwtTokenUtil jwtTokenUtil;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
     @PostMapping("/sign-up")
     public ResponseEntity<?> signup(@Valid @RequestBody SignupDto dto) {
@@ -50,22 +51,23 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody SignupDto dto) {
-        UserEntity user = userRepository.findByEmail(dto.getEmail())
+    public ResponseEntity<?> login(@RequestBody LoginDto dto) {
+        UserEntity user = userRepository.findByUsername(dto.getUsername())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         try {
             Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
+                    new UsernamePasswordAuthenticationToken(dto.getUsername(), dto.getPassword())
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
             String token = jwtTokenUtil.generateToken(authentication.getName());
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
-            return ResponseEntity.ok(new JwtResponse(token, user.getEmail()));
+            return ResponseEntity.ok(new JwtResponse(token, user.getEmail(), refreshToken.getToken()));
         } catch (Exception e) {
             log.error("Login failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid email or password.");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid username or password.");
         }
     }
 
@@ -74,4 +76,16 @@ public class AuthController {
         UserDto userDto = userService.getUserById(id);
         return ResponseEntity.ok(userDto);
     }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refreshToken(@RequestBody TokenRefreshRequest request) {
+        RefreshToken refreshToken = refreshTokenService.findByToken(request.getRefreshToken());
+        refreshTokenService.verifyExpiration(refreshToken);
+
+        String newToken = jwtTokenUtil.generateToken(refreshToken.getUser().getUsername());
+        return ResponseEntity.ok(
+                new JwtResponse(newToken, refreshToken.getUser().getEmail(), refreshToken.getToken())
+        );
+    }
+
 }
